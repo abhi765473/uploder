@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime, timedelta
 from pyrogram import Client, filters
 from pyrogram.types import Message
-import sqlite3
+
 
 import core as helper
 from utils import progress_bar
@@ -32,21 +32,15 @@ bot = Client(
     api_hash=API_HASH,
     bot_token=BOT_TOKEN)
 
+authorized_users = {}
+allowed_channels = set()  # Store allowed channel IDs here
 admins = [5850397219]  # Replace with your admin's Telegram user ID
-authorized_users= []
 
 help_button_keyboard = InlineKeyboardMarkup(
     [
         [InlineKeyboardButton("Help", callback_data="help")],
     ]
 )
-
-# Initialize the database
-conn = sqlite3.connect("users.db")
-c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS authorized_users
-             (user_id INTEGER PRIMARY KEY, join_datetime TEXT, subscription_days INTEGER, expiration_datetime TEXT)''')
-conn.commit()
 
 # Function to format the remaining time
 def format_remaining_time(expiration_datetime):
@@ -60,14 +54,9 @@ def format_remaining_time(expiration_datetime):
 async def check_subscriptions():
     while True:
         current_time = datetime.now()
-        c.execute("SELECT user_id, expiration_datetime FROM authorized_users")
-        rows = c.fetchall()
-        for row in rows:
-            user_id, expiration_datetime_str = row
-            expiration_datetime = datetime.strptime(expiration_datetime_str, "%Y-%m-%d %H:%M:%S")
-            if expiration_datetime <= current_time:
-                c.execute("DELETE FROM authorized_users WHERE user_id=?", (user_id,))
-                conn.commit()
+        for user_id, details in list(authorized_users.items()):
+            if details["expiration_datetime"] <= current_time:
+                authorized_users.pop(user_id)
                 await bot.send_message(
                     user_id,
                     "Your subscription has expired and you have been removed from the authorized users list."
@@ -84,21 +73,25 @@ async def add_user(client: Client, msg: Message):
         join_datetime = datetime.now()
         expiration_datetime = join_datetime + timedelta(days=subscription_days)
         
-        c.execute("INSERT OR REPLACE INTO authorized_users (user_id, join_datetime, subscription_days, expiration_datetime) VALUES (?, ?, ?, ?)",
-                  (user_id, join_datetime.strftime("%Y-%m-%d %H:%M:%S"), subscription_days, expiration_datetime.strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-
-        await client.send_photo(
-            user_id,
-            "IMG_20250218_013652_529.jpg",  # Replace with your offline image path
-            caption=(
-                f"Congratulations! You have been added to the authorized users list for {subscription_days} days by {msg.from_user.mention}. 🎉\n\n"
-                f"⏰ Join Datetime : {join_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
-                f"📅 Subscription Days : {subscription_days} Days \n\n"
-                f"⏰ Expiration DateTime : {expiration_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}"
+        if user_id not in authorized_users:
+            authorized_users[user_id] = {
+                "join_datetime": join_datetime,
+                "subscription_days": subscription_days,
+                "expiration_datetime": expiration_datetime
+            }
+            await client.send_photo(
+                user_id,
+                "IMG_20250218_013652_529.jpg",  # Replace with your offline image path
+                caption=(
+                    f"Congratulations! You have been added to the authorized users list for {subscription_days} days by {msg.from_user.mention}. 🎉\n\n"
+                    f"⏰ Join Datetime : {join_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
+                    f"📅 Subscription Days : {subscription_days} Days \n\n"
+                    f"⏰ Expiration DateTime : {expiration_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}"
+                )
             )
-        )
-        await msg.reply(f"User {user_id} has been added to the authorized users list for {subscription_days} days.")
+            await msg.reply(f"User {user_id} has been added to the authorized users list for {subscription_days} days.")
+        else:
+            await msg.reply(f"User {user_id} is already in the authorized users list.")
     except (IndexError, ValueError):
         await msg.reply("Usage: /add_user <user_id> <subscription_days>")
 
@@ -107,13 +100,15 @@ async def add_user(client: Client, msg: Message):
 async def remove_user(client: Client, msg: Message):
     try:
         user_id = int(msg.text.split()[1])
-        c.execute("DELETE FROM authorized_users WHERE user_id=?", (user_id,))
-        conn.commit()
-        await client.send_message(
-            user_id,
-            f"Sorry, you have been removed from the authorized users list by {msg.from_user.mention}."
-        )
-        await msg.reply(f"User {user_id} has been removed from the authorized users list.")
+        if user_id in authorized_users:
+            authorized_users.pop(user_id)
+            await client.send_message(
+                user_id,
+                f"Sorry, you have been removed from the authorized users list by {msg.from_user.mention}."
+            )
+            await msg.reply(f"User {user_id} has been removed from the authorized users list.")
+        else:
+            await msg.reply(f"User {user_id} is not in the authorized users list.")
     except (IndexError, ValueError):
         await msg.reply("Usage: /remove_user <user_id>")
 
@@ -179,13 +174,11 @@ async def main():
 
 
 
-
-
 # Define the start command handler
 @bot.on_message(filters.command("start"))
 async def start(client: Client, msg: Message):
     user = await client.get_me()
-
+    
     start_message = await client.send_message(
         msg.chat.id,
         "Initializing Uploader bot... 🤖\n\n"
@@ -221,49 +214,43 @@ async def start(client: Client, msg: Message):
     )
 
     await asyncio.sleep(1)
-    await start_message.edit_text(
-        "Setup Complete! 🎉\n\n"
-        "Progress: [🩵🩵🩵🩵🩵🩵🩵🩵🩵🩵] 100%\n\n"
-        "Bot is now ready to use."
-    )
+    if msg.from_user.id in authorized_users:
+        details = authorized_users[msg.from_user.id]
+        join_datetime = details["join_datetime"]
+        subscription_days = details["subscription_days"]
+        expiration_datetime = details["expiration_datetime"]
+        remaining_time = format_remaining_time(expiration_datetime)
 
-    with sqlite3.connect("users.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT * FROM authorized_users WHERE user_id=?", (msg.from_user.id,))
-        user_data = c.fetchone()
-        if user_data:
-            join_datetime = datetime.strptime(user_data[1], "%Y-%m-%d %H:%M:%S")
-            subscription_days = user_data[2]
-            expiration_datetime = datetime.strptime(user_data[3], "%Y-%m-%d %H:%M:%S")
-            remaining_time = format_remaining_time(expiration_datetime)
-
-            offline_image_path = "IMG_20250218_013652_529.jpg"  # Replace with your offline image path
-            await client.send_photo(
-                msg.chat.id,
-                offline_image_path,
-                caption=(
-                    f"Great! You are a 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 member!\n\n  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
-                    f"⏰ Join Datetime : {join_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
-                    f"📅 Subscription Days : {subscription_days} Days \n\n"
-                    f"⏰ Expiration DateTime : {expiration_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
-                    f"⌛️Remaining Time : {remaining_time}\n\n"
-                    "I Am A Bot For Download Links From Your **🌟.TXT 🌟** File And Then Upload That File On Telegram."
-                    " So Basically If You Want To Use Me First Send Me /drm Command And Then Follow Few Steps..\n\n"
-                    "**├── Bot Made By : **『 🅹🅰️🅸 🆂🅷🆁🅸 🆁🅰️🅼 ⚡️ 🧑‍💻』**\n\n"
-                    "Use /stop to stop any ongoing task."
-                ),
-                reply_markup=help_button_keyboard
+        offline_image_path = "IMG_20250218_013652_529.jpg"  # Replace with your offline image path
+        await client.send_photo(
+            msg.chat.id,
+            offline_image_path,
+            caption=(
+                f"Great! You are a 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 member!\n\n  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
+                f"⏰ Join Datetime : {join_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
+                f"📅 Subscription Days : {subscription_days} Days \n\n"
+                f"⏰ Expiration DateTime : {expiration_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
+                f"⌛️Remaining Time : {remaining_time}\n\n"
+                "I Am A Bot For Download Links From Your **🌟.TXT 🌟** File And Then Upload That File On Telegram."
+                " So Basically If You Want To Use Me First Send Me /drm Command And Then Follow Few Steps..\n\n"
+                "**├── Bot Made By : **『 🅹🅰️🅸 🆂🅷🆁🅸 🆁🅰️🅼 ⚡️ 🧑‍💻』**\n\n"
+                "Use /stop to stop any ongoing task."
+            ),
+            reply_markup=help_button_keyboard
+        )
+    else:
+        offline_image_path = "IMG_20250218_015150_501.jpg"  # Replace with your offline image path
+        await client.send_photo(
+            msg.chat.id,
+            offline_image_path,
+            caption=(
+                f"  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
+                "You are currently using the 𝗙𝗥𝗘𝗘 version. 🆓\n\n"
+                "I'm here to make your life easier by downloading videos from your **.txt** file 📄 and uploading them directly to Telegram!\n\n"
+                "Want to get started? Your id\n\n"
+                "💬 Contact @Course_diploma_bot to get the 𝗦𝗨𝗕𝗦𝗖𝗥𝗜𝗣𝗧𝗜𝗢𝗡 🎫 and unlock the full potential of your new bot! 🔓"
             )
-        else:
-            offline_image_path = "IMG_20250218_015150_501.jpg"  # Replace with your offline image path
-            await client.send_photo(
-                msg.chat.id,
-                offline_image_path,
-                caption=(
-                    f"  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
-                    "You are currently using the 𝗙𝗥𝗘𝗘 version. 🆓\n\n"
-                    "I'm here to make your life easier by downloading videos from your **.txt** file 📄 and uploading them directly to Telegram!\n\n"
-                ) )
+        )
 
 # 
 

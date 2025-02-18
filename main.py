@@ -184,7 +184,7 @@ async def main():
 @bot.on_message(filters.command("start"))
 async def start(client: Client, msg: Message):
     user = await client.get_me()
-    
+
     start_message = await client.send_message(
         msg.chat.id,
         "Initializing Uploader bot... 🤖\n\n"
@@ -226,43 +226,43 @@ async def start(client: Client, msg: Message):
         "Bot is now ready to use."
     )
 
-    if msg.from_user.id in authorized_users:
-        details = authorized_users[msg.from_user.id]
-        join_datetime = details["join_datetime"]
-        subscription_days = details["subscription_days"]
-        expiration_datetime = details["expiration_datetime"]
-        remaining_time = format_remaining_time(expiration_datetime)
+    with sqlite3.connect("users.db") as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM authorized_users WHERE user_id=?", (msg.from_user.id,))
+        user_data = c.fetchone()
+        if user_data:
+            join_datetime = datetime.strptime(user_data[1], "%Y-%m-%d %H:%M:%S")
+            subscription_days = user_data[2]
+            expiration_datetime = datetime.strptime(user_data[3], "%Y-%m-%d %H:%M:%S")
+            remaining_time = format_remaining_time(expiration_datetime)
 
-        offline_image_path = "IMG_20250218_013652_529.jpg"  # Replace with your offline image path
-        await client.send_photo(
-            msg.chat.id,
-            offline_image_path,
-            caption=(
-                f"Great! You are a 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 member!\n\n  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
-                f"⏰ Join Datetime : {join_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
-                f"📅 Subscription Days : {subscription_days} Days \n\n"
-                f"⏰ Expiration DateTime : {expiration_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
-                f"⌛️Remaining Time : {remaining_time}\n\n"
-                "I Am A Bot For Download Links From Your **🌟.TXT 🌟** File And Then Upload That File On Telegram."
-                " So Basically If You Want To Use Me First Send Me /drm Command And Then Follow Few Steps..\n\n"
-                "**├── Bot Made By : **『 🅹🅰️🅸 🆂🅷🆁🅸 🆁🅰️🅼 ⚡️ 🧑‍💻』**\n\n"
-                "Use /stop to stop any ongoing task."
-            ),
-            reply_markup=help_button_keyboard
-        )
-    else:
-        offline_image_path = "IMG_20250218_015150_501.jpg"  # Replace with your offline image path
-        await client.send_photo(
-            msg.chat.id,
-            offline_image_path,
-            caption=(
-                f"  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
-                "You are currently using the 𝗙𝗥𝗘𝗘 version. 🆓\n\n"
-                "I'm here to make your life easier by downloading videos from your **.txt** file 📄 and uploading them directly to Telegram!\n\n"
-                "Want to get started? Your id\n\n"
-                "💬 Contact @Course_diploma_bot to get the 𝗦𝗨𝗕𝗦𝗖𝗥𝗜𝗣𝗧𝗜𝗢𝗡 🎫 and unlock the full potential of your new bot! 🔓"
+            offline_image_path = "IMG_20250218_013652_529.jpg"  # Replace with your offline image path
+            await client.send_photo(
+                msg.chat.id,
+                offline_image_path,
+                caption=(
+                    f"Great! You are a 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 member!\n\n  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
+                    f"⏰ Join Datetime : {join_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
+                    f"📅 Subscription Days : {subscription_days} Days \n\n"
+                    f"⏰ Expiration DateTime : {expiration_datetime.strftime('%d-%m-%Y %I:%M:%S %p')}\n\n"
+                    f"⌛️Remaining Time : {remaining_time}\n\n"
+                    "I Am A Bot For Download Links From Your **🌟.TXT 🌟** File And Then Upload That File On Telegram."
+                    " So Basically If You Want To Use Me First Send Me /drm Command And Then Follow Few Steps..\n\n"
+                    "**├── Bot Made By : **『 🅹🅰️🅸 🆂🅷🆁🅸 🆁🅰️🅼 ⚡️ 🧑‍💻』**\n\n"
+                    "Use /stop to stop any ongoing task."
+                ),
+                reply_markup=help_button_keyboard
             )
-        )
+        else:
+            offline_image_path = "IMG_20250218_015150_501.jpg"  # Replace with your offline image path
+            await client.send_photo(
+                msg.chat.id,
+                offline_image_path,
+                caption=(
+                    f"  🌟 Welcome {msg.from_user.mention} ! 👋\n\n"
+                    "You are currently using the 𝗙𝗥𝗘𝗘 version. 🆓\n\n"
+                    "I'm here to make your life easier by downloading videos from your **.txt** file 📄 and uploading them directly to Telegram!\n\n"
+                ) )
 
 # 
 

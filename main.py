@@ -33,6 +33,7 @@ bot = Client(
     bot_token=BOT_TOKEN)
 
 admins = [5850397219]  # Replace with your admin's Telegram user ID
+authorized_users= []
 
 help_button_keyboard = InlineKeyboardMarkup(
     [

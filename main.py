@@ -306,16 +306,28 @@ async def upload(bot: Client, m: Message):
     path = f"./downloads/{m.chat.id}"
 
     try:
+        # Extract the file name without extension
+        file_name = os.path.basename(x)  # Get the file name from the path
+        raw_text0 = os.path.splitext(file_name)[0]  # Remove the file extension
+
         with open(x, "r") as f:
             content = f.read()
         content = content.split("\n")
         links = []
         for i in content:
             links.append(i.split("://", 1))
+
+        # Print or use raw_text0 for further processing
+        print(f"Extracted file name: {raw_text0}")
+
+        # Continue with the rest of the logic
+        # (e.g., processing links, etc.)
+
+        # Clean up the downloaded file
         os.remove(x)
-        # print(len(links))
-    except:
-        await m.reply_text("**Invalid file input.**")
+
+    except Exception as e:
+        await m.reply_text(f"**∝ 𝐈𝐧𝐯𝐚𝐥𝐢𝐝 𝐟𝐢𝐥𝐞 𝐢𝐧𝐩𝐮𝐭 𝐨𝐫 𝐞𝐫𝐫𝐨𝐫: {str(e)}**")
         os.remove(x)
         return
 
@@ -328,11 +340,16 @@ async def upload(bot: Client, m: Message):
     raw_text = input0.text
     await input0.delete(True)
 
-    await editable.edit("**Now Please Send Me Your Batch Name**")
+    await editable.edit("**∝ 𝐍𝐨𝐰 𝐏𝐥𝐞𝐚𝐬𝐞 𝐒𝐞𝐧𝐝 𝐌𝐞 𝐘𝐨𝐮𝐫 𝐁𝐚𝐭𝐜𝐡 𝐍𝐚𝐦𝐞**")
     input1: Message = await bot.listen(editable.chat.id)
-    raw_text0 = input1.text
-    await input1.delete(True)
     
+    # Check if the input is "C" to copy from raw_text0
+    if input1.text.strip().lower() == "c":
+        raw_text0 = raw_text0  # Use the existing value of raw_text0
+    else:
+        raw_text0 = input1.text  # Use the user's input
+    
+    await input1.delete(True)
 
     await editable.edit("**Enter Resolution 🎞️ : **\n\n**144**\n**240**\n**360**\n**480**\n**720**\n**1080**\n\n**please choose quality**")
     input2: Message = await bot.listen(editable.chat.id)
@@ -460,12 +477,15 @@ async def upload(bot: Client, m: Message):
                 ytf = f"b[height<={raw_text2}]/bv[height<={raw_text2}]+ba[ext=m4a]/b[ext=mp4]"
             if "jw-prod" in url:
                 cmd = f'yt-dlp -o "{name}.mp4" "{url}"'
-            elif 'd1wy033kfw4qbc.cloudfront.net' in url:
-                cmd = f'yt-dlp -f "{ytf}" "{url}" --referer "https://iasscore.edugyaan.com/" -o "{name}.mp4"'
-            elif 'penpencilvod.pc.cdn.bitgravity.com' in url :
-                cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4" --add-header authorization:"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MjAwODUzNDQuNTksImRhdGEiOnsiX2lkIjoiNjY2NmUxY2VmNmEzYjNlNGU3ODIyMTVkIiwidXNlcm5hbWUiOiI5MDI0NTU0NTc2IiwiZmlyc3ROYW1lIjoiUmFodWwiLCJsYXN0TmFtZSI6IiIsIm9yZ2FuaXphdGlvbiI6eyJfaWQiOiI1ZWIzOTNlZTk1ZmFiNzQ2OGE3OWQxODkiLCJ3ZWJzaXRlIjoicGh5c2ljc3dhbGxhaC5jb20iLCJuYW1lIjoiUGh5c2ljc3dhbGxhaCJ9LCJlbWFpbCI6InJhaHVsY2hvdWhhbkBnbWFpbC5jb20iLCJyb2xlcyI6WyI1YjI3YmQ5NjU4NDJmOTUwYTc3OGM2ZWYiXSwiY291bnRyeUdyb3VwIjoiSU4iLCJ0eXBlIjoiVVNFUiJ9LCJpYXQiOjE3MTk0ODA1NDR9.NKpXT-e5Mzrrj1t05qLIGOGqyRbEXEGuUJ1q9xnIFNs"'
+            elif "youtube.com" in url or "youtu.be" in url:
+                cmd = f'yt-dlp --cookies youtube_cookies.txt -f "{ytf}" "{url}" -o "{name}".mp4'
+            
+            elif "m3u8" or "livestream" in url:
+                cmd = f'yt-dlp -f "{ytf}" --no-keep-video --remux-video mkv "{url}" -o "{name}.%(ext)s"'
+
             else:
                 cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4"'
+
             try:  
                 
                 cc = f'**——— ✦ ** {str(count).zfill(3)}.**——— ✦ ** \n\n** 🎞️ Title :**{𝗻𝗮𝗺𝗲𝟭}\n**├── Extention : @Course_diploma_bot.mkv**\n**├── Resolution : {res}**\n\n**📚 Course** » **{raw_text0}**\n\n**🌟 Extracted By** **{raw_text3}**'

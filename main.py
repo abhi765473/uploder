@@ -588,14 +588,13 @@ async def upload(bot: Client, m: Message):
                     f"**downloading Interupted **\n{str(e)}\n**Name** » {name}\n**Link** » `{url}`"
                 )
                 continue
-
-  except Exception as e:
-    await m.reply_text(str(e))
-  await m.reply_text(f"⋅ ─ list index (**{str(count).zfill(3)}**-**{len(links) - count}**) out of range ─ ⋅\n\n"
+  
+    except Exception as e:
+        await m.reply_text(e)
+    await m.reply_text(f"⋅ ─ list index (**{str(count).zfill(3)}**-**{len(links) - count}**) out of range ─ ⋅\n\n"
                    f"✨ **BATCH** » {name} ✨\n\n"
-                   f"⋅ ─ DOWNLOADING ✩ COMPLETED ─ ⋅")
-  await m.reply_text("**That's It ❤️**")
-
-
+                   f"⋅ ─ DOWNLOADING ✩ COMPLETED ─ .")
+    await m.reply_text("**That's It ❤️**")
 
 bot.run()
+  

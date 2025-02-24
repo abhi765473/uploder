@@ -6,10 +6,11 @@ import time
 import asyncio
 import requests
 import subprocess
+
 from datetime import datetime, timedelta
 from pyrogram import Client, filters
 from pyrogram.types import Message
-
+from content_fetcher import set_token, generate_content_file
 
 import core as helper
 from utils import progress_bar
@@ -62,7 +63,37 @@ async def check_subscriptions():
                     "Your subscription has expired and you have been removed from the authorized users list."
                 )
         await asyncio.sleep(3600)  # Check every hour
+# Replace with your admin's Telegram user ID
 
+
+@bot.on_message(filters.command("token") & filters.user(admins))
+async def fetch_content(client: Client, msg: Message):
+    await msg.reply("**Please enter your token:**")
+    token_msg = await bot.listen(msg.chat.id)
+    
+    token = token_msg.text
+    set_token(token)
+    
+    await msg.reply("**Enter your batch name:**")
+    batch_msg = await bot.listen(msg.chat.id)
+    
+    batch_name = batch_msg.text
+    await msg.reply(f"**Processing content for batch `{batch_name}`, please wait...**")
+
+    try:
+        result_file = await generate_content_file(None)
+        if result_file:
+            new_file_name = f"{batch_name}.txt"
+            os.rename(result_file, new_file_name)
+            await msg.reply_document(new_file_name)
+        else:
+            await msg.reply("Failed to fetch content or no content available.")
+    except Exception as e:
+        await msg.reply(f"An error occurred: {e}")
+
+    # Clean up the generated file after sending it
+    if result_file and os.path.exists(new_file_name):
+        os.remove(new_file_name)
 # Define the add_user command handler for admin
 @bot.on_message(filters.command("add_user") & filters.user(admins))
 async def add_user(client: Client, msg: Message):
@@ -111,6 +142,33 @@ async def remove_user(client: Client, msg: Message):
             await msg.reply(f"User {user_id} is not in the authorized users list.")
     except (IndexError, ValueError):
         await msg.reply("Usage: /remove_user <user_id>")
+
+
+# Function to run content_fetcher.py with token and batch name
+
+
+# Command to start the content fetch process
+@bot.on_message(filters.command("token") & filters.user(admins))
+async def fetch_content(ctx, token: str):
+    set_token(token)
+    await ctx.send("Processing content, please wait...")
+
+    try:
+        result_file = await generate_content_file(None)
+        if result_file:
+            await ctx.send("Content fetched successfully. Sending the file...")
+            await ctx.send(file=discord.File(result_file))
+        else:
+            await ctx.send("Failed to fetch content or no content available.")
+    except Exception as e:
+        await ctx.send(f"An error occurred: {e}")
+
+    # Clean up the generated file after sending it
+    if os.path.exists(result_file):
+        os.remove(result_file)
+
+
+
 
 # Define the id command handler to get user or channel ID
 @bot.on_message(filters.command("id"))

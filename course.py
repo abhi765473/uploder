@@ -1,8 +1,11 @@
 import requests
 import sys
+from pyrogram import Client, filters
 
 # Set the console to use UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
+
+user_inputs = {}
 
 def course_details(token2, institute_name, org_code):
     # URL for the API with the token included
@@ -34,7 +37,9 @@ def course_details(token2, institute_name, org_code):
     else:
         print(f"Request failed with status code {response.status_code}")
 
-@bot.on_message(filters.command("app") & filters.private)
+app = Client("my_bot")
+
+@app.on_message(filters.command("app") & filters.private)
 async def fetch_courses_command(client, msg):
     chat_id = msg.chat.id
 
@@ -42,13 +47,13 @@ async def fetch_courses_command(client, msg):
     if chat_id not in user_inputs:
         user_inputs[chat_id] = {}
         await msg.reply("Enter your token:")
-        token_msg = await bot.listen(chat_id)
+        token_msg = await app.listen(chat_id)
         user_inputs[chat_id]["token2"] = token_msg.text
         await msg.reply("Enter your institute name:")
-        institute_name_msg = await bot.listen(chat_id)
+        institute_name_msg = await app.listen(chat_id)
         user_inputs[chat_id]["institute_name"] = institute_name_msg.text
         await msg.reply("Enter your org code:")
-        org_code_msg = await bot.listen(chat_id)
+        org_code_msg = await app.listen(chat_id)
         user_inputs[chat_id]["org_code"] = org_code_msg.text
 
         token2 = user_inputs[chat_id]["token2"]
@@ -61,3 +66,6 @@ async def fetch_courses_command(client, msg):
 
         await msg.reply(f"Course details have been fetched and saved to {institute_name}_{org_code}_courses.txt.")
         return
+
+if __name__ == "__main__":
+    app.run()

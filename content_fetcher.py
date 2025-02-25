@@ -133,24 +133,18 @@ async def process_folder(session, folder_id, folder_path, file, indent=0):
 
     subfolders = await get_folders(session, folder_id)
     if subfolders:
-        tasks = [
-            process_folder(session, subfolder_id, folder_path + " " + subfolder_name, file, indent + 2)
-            for subfolder_id, subfolder_name in subfolders.items()
-        ]
-        await asyncio.gather(*tasks)
+        for subfolder_id, subfolder_name in subfolders.items():
+            await process_folder(session, subfolder_id, folder_path + " " + subfolder_name, file, indent + 2)
 
 async def generate_content_file(msg):
     async with aiohttp.ClientSession() as session:
         folders = await get_folders(session)
 
-        file_name = "batch_content.txt"
+        file_name = "{batch_name}.txt"
         with open(file_name, 'w', encoding='utf-8') as file:
             if folders:
-                tasks = [
-                    process_folder(session, folder_id, folder_name, file)
-                    for folder_id, folder_name in folders.items()
-                ]
-                await asyncio.gather(*tasks)
+                for folder_id, folder_name in folders.items():
+                    await process_folder(session, folder_id, folder_name, file)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         new_file_name = f"batch_content_{timestamp}.txt"
@@ -159,4 +153,4 @@ async def generate_content_file(msg):
         if os.path.getsize(new_file_name) > 0:
             return new_file_name
         else:
-            return None
+            return

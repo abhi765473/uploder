@@ -352,9 +352,7 @@ async def restart_handler(_, m):
 # Define the drm command handler
 @bot.on_message(filters.command(["drm"]))
 async def upload(bot: Client, m: Message):
-    if m.from_user.id not in authorized_users:
-        await m.reply_text("Sorry, you are not eligible.")
-        return
+    
 
     editable = await m.reply_text('➠ 𝐒𝐞𝐧𝐝 𝐌𝐞 𝐘𝐨𝐮𝐫 𝐓𝐗𝐓 𝐅𝐢𝐥𝐞 𝐢𝐧 𝐀 𝐏𝐫𝐨𝐩𝐞𝐫 𝐖𝐚𝐲 **\n\n**├── Bot Made By : **『 🅹🅰️🅸 🆂🅷🆁🅸 🆁🅰️🅼 ⚡️ 🧑‍💻』**')
     input: Message = await bot.listen(editable.chat.id)

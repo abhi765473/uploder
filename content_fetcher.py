@@ -73,6 +73,7 @@ def filter_content(content, folder_path):
                         new_url_parts = thumbnailurl.replace('drm/wv/', 'drm/').split('/')
                         if len(new_url_parts) > 6:
                             new_url = "/".join(new_url_parts[:5] + new_url_parts[6:])  # Remove the 6th part
+                            new_url = new_url.replace('/master.m3u8', '/playlist.m3u8')
                             thumbnailurl = new_url
                     elif 'cpvi' in thumbnailurl:
                         new_url = thumbnailurl.replace('cpvideocdn.testbook.com/streams/', 'cpvod.testbook.com/')
@@ -93,6 +94,7 @@ def filter_content(content, folder_path):
                         if len(new_url_parts) > 1:
                             new_url = f'https://media-cdn.classplusapp.com/alisg-cdn-a.classplusapp.com/b08bad9ff8d969639b2e43d5769342cc62b510c4345d2f7f153bec53be84fe35/{new_url_parts[-1]}.m3u8'
                             new_url = new_url.replace('.jpeg', '')
+                            new_url = new_url.replace('.m3u8', '/master.m3u8')
                             thumbnailurl = new_url
                     elif 'pdf' in thumbnailurl:
                         thumbnailurl = thumbnailurl

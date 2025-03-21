@@ -385,9 +385,9 @@ async def fetch_details_command(_, message):
         async def handle_org_code(_, org_code_message):
             org_code = org_code_message.text.strip()
 
-            # Validate Org Code before making the API call
+            # Validate the Org Code
             if not org_code:
-                await org_code_message.reply_text("Org Code is missing or invalid. Please provide a valid Org Code.")
+                await org_code_message.reply_text("Error: Org Code is missing or invalid. Please provide a valid Org Code.")
                 return
 
             # Fetch organization details
@@ -398,7 +398,7 @@ async def fetch_details_command(_, message):
                 return
 
             global stored_org_id
-            stored_org_id = org_id_or_error  # Save the org_id globally for reuse
+            stored_org_id = org_id_or_error  # Save Org ID globally for reuse
 
             # Display organization details
             await org_code_message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
@@ -423,13 +423,17 @@ async def fetch_details_command(_, message):
                     await course_id_message.reply_text("Invalid Course ID. Please provide a numeric Course ID.")
                     return
 
+                # Debug: Ensure stored_org_id and course_id are correct
                 global stored_org_id
+                print(f"Debug: Stored Org ID: {stored_org_id}, Course ID: {course_id}")
+
                 if not stored_org_id:
                     await course_id_message.reply_text("Error: Organization ID is not available. Please restart the process.")
                     return
 
                 # Encode the Course ID with Org ID
                 encoded_value = encode_course_with_base64(course_id, stored_org_id)
+
                 if "Error" in encoded_value:
                     await course_id_message.reply_text(f"Encoding failed: {encoded_value}")
                     return
@@ -880,19 +884,37 @@ async def upload(bot: Client, m: Message):
 
                 elif "adda247" in url:
                     try:
-                        getstatusoutput(
-                              f'curl --http2 -X GET -H "Host:store.adda247.com" -H "user-agent:Mozilla/5.0 (Linux; Android 11; moto g(40) fusion Build/RRI31.Q1-42-51-8; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/97.0.4692.98 Mobile Safari/537.36" -H "accept:*/*" -H "x-requested-with:com.adda247.app" -H "sec-fetch-site:same-origin" -H "sec-fetch-mode:cors" -H "sec-fetch-dest:empty" -H "referer:https://store.adda247.com/build/pdf.worker.js" -H "accept-encoding:gzip, deflate" -H "accept-language:en-US,en;q=0.9" -H "cookie:cp_token={raw_text4}" "{url}" --output "{name}.pdf"'
+                         # Extract the file extension from the URL (e.g., .doc, .pdf)
+                        file_extension = url.split(".")[-1]  # Get the extension dynamically
+                        output_file = f"{name}.{file_extension}"  # Create output file name
+                        download_command = (
+                            f'curl --http2 -X GET -H "Host:store.adda247.com" '
+                            f'-H "user-agent:Mozilla/5.0 (Linux; Android 11; moto g(40) fusion Build/RRI31.Q1-42-51-8; wv) '
+                            f'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/97.0.4692.98 Mobile Safari/537.36" '
+                            f'-H "accept:*/*" -H "x-requested-with:com.adda247.app" '
+                            f'-H "sec-fetch-site:same-origin" -H "sec-fetch-mode:cors" -H "sec-fetch-dest:empty" '
+                            f'-H "referer:https://store.adda247.com/build/pdf.worker.js" -H "accept-encoding:gzip, deflate" '
+                            f'-H "accept-language:en-US,en;q=0.9" '
+                            f'-H "cookie:cp_token={raw_text4}" "{url}" --output "{output_file}"'
                         )
+                        status, output = getstatusoutput(download_command)
+                        # Check if the file was downloaded successfully
+                        if status != 0 or not os.path.exists(output_file):
+                             raise FileNotFoundError(f"Failed to download the file. Curl output: {output}")
 
-                        copy = await bot.send_document(chat_id=m.chat.id,document=f'{name}.pdf', caption=cc1)
+                         # Send the document
+                        await bot.send_document(chat_id=m.chat.id, document=output_file, caption=cc1)
                         count += 1
+                        
+                        
                         await prog.delete(True)  # Delete the progress message
-                        os.remove(f"{name}.pdf")  # Remove the file
+                         # Cleanup after sending
+                        os.remove(output_file)
                         time.sleep(2)
                     except Exception as e:
                         await m.reply_text(
                         f"{e}\nDownload Failed\n\nName : {name}\n\nLink : {url}"
-                )
+                 )
                         pass
                 elif ".pdf" in url:
                     try:

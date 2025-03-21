@@ -379,13 +379,14 @@ def encode_course_with_base64(course_id, org_id):
 @bot.on_message(filters.command("fetchdetails") & filters.private)
 async def fetch_details_command(_, message):
     try:
+        # Step 1: Ask for Org Code
         await message.reply_text("Please send your Org Code:")
 
         @bot.on_message(filters.text & filters.private)
         async def handle_org_code(_, org_code_message):
             org_code = org_code_message.text.strip()
 
-            # Validate the Org Code
+            # Validate Org Code
             if not org_code:
                 await org_code_message.reply_text("Error: Org Code is missing or invalid. Please provide a valid Org Code.")
                 return
@@ -397,8 +398,9 @@ async def fetch_details_command(_, message):
                 await org_code_message.reply_text(f"Error: {org_id_or_error}\nPlease ensure the Org Code is correct and try again.")
                 return
 
+            # Save Org ID globally for reuse
             global stored_org_id
-            stored_org_id = org_id_or_error  # Save Org ID globally for reuse
+            stored_org_id = org_id_or_error
 
             # Display organization details
             await org_code_message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
@@ -411,7 +413,7 @@ async def fetch_details_command(_, message):
                 await org_code_message.reply_text("No courses found for this organization.")
                 return
 
-            # Ask for Course ID
+            # Step 2: Ask for Course ID
             await org_code_message.reply_text("Please send your Course ID from the course list to encode:")
 
             @bot.on_message(filters.text & filters.private)
@@ -423,9 +425,9 @@ async def fetch_details_command(_, message):
                     await course_id_message.reply_text("Invalid Course ID. Please provide a numeric Course ID.")
                     return
 
-                # Debug: Ensure stored_org_id and course_id are correct
+                # Ensure stored_org_id is retained
                 global stored_org_id
-                print(f"Debug: Stored Org ID: {stored_org_id}, Course ID: {course_id}")
+                print(f"Debug: Stored Org ID: {stored_org_id}")  # Debugging line
 
                 if not stored_org_id:
                     await course_id_message.reply_text("Error: Organization ID is not available. Please restart the process.")
@@ -442,7 +444,6 @@ async def fetch_details_command(_, message):
                 await course_id_message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
     except Exception as e:
         await message.reply_text(f"An unexpected error occurred: {str(e)}")
-
 
         
 @bot.on_message(filters.command("id"))
@@ -885,32 +886,33 @@ async def upload(bot: Client, m: Message):
                 elif "adda247" in url:
                     try:
                          # Extract the file extension from the URL (e.g., .doc, .pdf)
-                        file_extension = url.split(".")[-1]  # Get the extension dynamically
-                        output_file = f"{name}.{file_extension}"  # Create output file name
-                        download_command = (
-                            f'curl --http2 -X GET -H "Host:store.adda247.com" '
-                            f'-H "user-agent:Mozilla/5.0 (Linux; Android 11; moto g(40) fusion Build/RRI31.Q1-42-51-8; wv) '
-                            f'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/97.0.4692.98 Mobile Safari/537.36" '
-                            f'-H "accept:*/*" -H "x-requested-with:com.adda247.app" '
-                            f'-H "sec-fetch-site:same-origin" -H "sec-fetch-mode:cors" -H "sec-fetch-dest:empty" '
-                            f'-H "referer:https://store.adda247.com/build/pdf.worker.js" -H "accept-encoding:gzip, deflate" '
-                            f'-H "accept-language:en-US,en;q=0.9" '
-                            f'-H "cookie:cp_token={raw_text4}" "{url}" --output "{output_file}"'
-                        )
-                        status, output = getstatusoutput(download_command)
-                        # Check if the file was downloaded successfully
-                        if status != 0 or not os.path.exists(output_file):
-                             raise FileNotFoundError(f"Failed to download the file. Curl output: {output}")
-
+                        response = requests.get(url, headers={
+                            "Host": "store.adda247.com",  # Create output file name
+                            "User-Agent": "Mozilla/5.0 (Linux; Android 11; moto g(40) fusion Build/RRI31.Q1-42-51-8; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/97.0.4692.98 Mobile Safari/537.36",
+                            "accept": "*/*",
+                            "x-requested-with": "com.adda247.app",
+                            "sec-fetch-site": "same-origin",
+                            "sec-fetch-mode": "cors",
+                            "sec-fetch-dest": "empty",
+                            "referer": "https://store.adda247.com/build/pdf.worker.js",
+                            "accept-encoding": "gzip, deflate",
+                            "accept-language": "en-US,en;q=0.9",
+                            "cookie": f"cp_token={raw_text4}"
+                         }, stream=True)
+                         # Check response
+                        if response.status_code == 200:
+                            file_extension = url.split(".")[-1]  # Extract file extension
+                            output_file = f"{name}.{file_extension}"  # Save with appropriate file extension
+                            # Save file locally
+                            with open(output_file, "wb") as f:
+                                for chunk in response.iter_content(chunk_size=1024):
+                                        f.write(chunk)
                          # Send the document
-                        await bot.send_document(chat_id=m.chat.id, document=output_file, caption=cc1)
-                        count += 1
-                        
-                        
-                        await prog.delete(True)  # Delete the progress message
+                            await bot.send_document(chat_id=m.chat.id, document=output_file, caption=cc1)
+                            count += 1
                          # Cleanup after sending
-                        os.remove(output_file)
-                        time.sleep(2)
+                            os.remove(output_file)
+                            time.sleep(2)
                     except Exception as e:
                         await m.reply_text(
                         f"{e}\nDownload Failed\n\nName : {name}\n\nLink : {url}"

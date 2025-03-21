@@ -371,12 +371,12 @@ def encode_course_with_base64(course_id, org_id):
 # Bot setup
 app = Client("bot")
 
-@app.on_message(filters.command("fetchdetails") & filters.private)
+@bot.on_message(filters.command("fetchdetails") & filters.private)
 async def fetch_details_command(_, message):
     try:
         await message.reply_text("Please send your Org Code:")
 
-        @app.on_message(filters.text & filters.private)
+        @bot.on_message(filters.text & filters.private)
         async def handle_org_code(_, org_code_message):
             org_code = org_code_message.text.strip()
 
@@ -388,7 +388,7 @@ async def fetch_details_command(_, message):
                 return
 
             global stored_org_id
-            stored_org_id = org_id_or_error
+            stored_org_id = org_id_or_error  # Save the org_id globally for reuse
 
             # Display organization details
             await org_code_message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
@@ -404,7 +404,7 @@ async def fetch_details_command(_, message):
             # Ask for Course ID
             await org_code_message.reply_text("Please send your Course ID from the course list to encode:")
 
-            @app.on_message(filters.text & filters.private)
+            @bot.on_message(filters.text & filters.private)
             async def handle_course_id(_, course_id_message):
                 course_id = course_id_message.text.strip()
 
@@ -417,6 +417,7 @@ async def fetch_details_command(_, message):
                     await course_id_message.reply_text("Error: Organization ID is not available. Please restart the process.")
                     return
 
+                # Encode Course ID with Org ID
                 encoded_value = encode_course_with_base64(course_id, stored_org_id)
                 if "Error" in encoded_value:
                     await course_id_message.reply_text(f"Encoding failed: {encoded_value}")
@@ -425,6 +426,7 @@ async def fetch_details_command(_, message):
                 await course_id_message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
     except Exception as e:
         await message.reply_text(f"An unexpected error occurred: {str(e)}")
+
 
 
 
@@ -466,13 +468,14 @@ async def get_id(client: Client, msg: Message):
         user_id = msg.from_user.id
         keyboard = InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("📋 Copy ID", switch_inline_query=f"{user_id}")],
+                [InlineKeyboardButton("📋 Copy ID", switch_inline_query=f"**{user_id}**")],
                 [InlineKeyboardButton("📥 Send Here", callback_data="send_here")]
             ]
         )
         await msg.reply(f"Your Telegram ID: {user_id}\n\n"
                         "Use the options below 👇",
                         reply_markup=keyboard)
+        
 
         
 """@Client.on_message(filters.command("id"))
@@ -894,6 +897,22 @@ async def upload(bot: Client, m: Message):
                         count += 1
                         continue
 
+                elif "adda" in url:
+                    try:
+                        getstatusoutput(
+                              f'curl --http2 -X GET -H "Host:store.adda247.com" -H "user-agent:Mozilla/5.0 (Linux; Android 11; moto g(40) fusion Build/RRI31.Q1-42-51-8; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/97.0.4692.98 Mobile Safari/537.36" -H "accept:*/*" -H "x-requested-with:com.adda247.app" -H "sec-fetch-site:same-origin" -H "sec-fetch-mode:cors" -H "sec-fetch-dest:empty" -H "referer:https://store.adda247.com/build/pdf.worker.js" -H "accept-encoding:gzip, deflate" -H "accept-language:en-US,en;q=0.9" -H "cookie:cp_token={raw_text4}" "{url}" --output "{name}.pdf"'
+                        )
+
+                        copy = await bot.send_document(chat_id=m.chat.id,document=ka, caption=cc1)
+                        count += 1
+                        await prog.delete(True)  # Delete the progress message
+                        os.remove(f"{name}.pdf")  # Remove the file
+                        time.sleep(2)
+                    except Exception as e:
+                        await m.reply_text(
+                        f"{e}\nDownload Failed\n\nName : {name}\n\nLink : {url}"
+                )
+                        pass
                 elif ".pdf" in url:
                     try:
                         cmd = f'yt-dlp -o "{name}.pdf" "{url}"'
@@ -907,6 +926,7 @@ async def upload(bot: Client, m: Message):
                         time.sleep(e.x)
                         count += 1
                         continue
+
 
                 elif ".zip" in url:
                     try:

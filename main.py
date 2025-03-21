@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import cloudscraper
 import time
 import asyncio
 from aiohttp import web

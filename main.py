@@ -400,6 +400,9 @@ async def fetch_details_command(_, message):
         if "Error" in encoded_value:
             await message.reply_text(f"Encoding failed: {encoded_value}")
             return
+        set_token(encoded_value)
+        await message.reply_text(f"Token set successfully! Encoded value: {encoded_value}")
+
 
         # Send the encoded value back to the user
         await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")

@@ -283,8 +283,14 @@ async def fetch_content(ctx, token: str):
 
 
 
+import requests
+import base64
+import json
+import os
+from pyrogram import Client, filters
+from pyrogram.errors import FloodWait
 
-# Global variable to store the organization ID
+# Global variable to retain organization ID between steps
 stored_org_id = None
 
 # Function to fetch organization details
@@ -304,15 +310,11 @@ def fetch_org_details(org_code):
             'region': 'IN',
             'user-agent': 'Mobile-Android',
         }
-
         response = requests.get(f'{api}/orgs/{org_code}', headers=headers)
         if response.status_code == 200:
             res = response.json()
             org_id = res['data']['orgId']
             org_name = res['data'].get('orgName', 'Name not available')
-
-            global stored_org_id
-            stored_org_id = org_id  # Save org ID for later use
             return org_name, org_id
         else:
             return None, f"Failed to fetch org details. Status Code: {response.status_code} - {response.text}"
@@ -324,36 +326,24 @@ def fetch_courses(org_id):
     try:
         decoded_value = f'{{"tutorId":null,"orgId":"{org_id}","categoryId":null}}'
         encoded_value = base64.b64encode(decoded_value.encode('utf-8')).decode('utf-8')
-
         base_url = f"https://api.classplusapp.com/v2/course/preview/similar/{encoded_value}"
-        query_params = {
-            "filterId": "1",
-            "sortId": "7",
-            "subCatList": "",
-            "mainCategory": "0",
-            "limit": "100000",
-            "offset": "0"
-        }
         headers = {
             "accept": "application/json, text/plain, */*",
             "Api-Version": "22",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
-
-        response = requests.get(base_url, params=query_params, headers=headers)
+        response = requests.get(base_url, headers=headers)
         if response.status_code == 200:
             data = response.json()
             courses = data.get('data', {}).get('coursesData', [])
             course_list = []
             output = "Course List:\n" + "-" * 40 + "\n"
-
             for idx, course in enumerate(courses, start=1):
                 course_name = course.get('name', 'No Name Provided')
                 batch_id = course.get('id', 'N/A')
                 output += f"{idx}. {course_name} (Batch ID: {batch_id})\n"
                 if batch_id != "N/A":
                     course_list.append(batch_id)
-
             return output, course_list
         else:
             return f"API Error: {response.status_code} - {response.text}", []
@@ -375,75 +365,65 @@ def encode_course_with_base64(course_id, org_id):
     except Exception as e:
         return f"Error during encoding: {e}"
 
-# Bot commands
+# Bot command to fetch organization details
 @bot.on_message(filters.command("fetchdetails") & filters.private)
 async def fetch_details_command(_, message):
     try:
-        # Step 1: Ask for Org Code
+        global stored_org_id  # Declare global to use across handlers
+        stored_org_id = None  # Reset Org ID at the start of the flow
         await message.reply_text("Please send your Org Code:")
-
-        @bot.on_message(filters.text & filters.private)
-        async def handle_org_code(_, org_code_message):
-            org_code = org_code_message.text.strip()
-
-            # Validate Org Code
-            if not org_code:
-                await org_code_message.reply_text("Error: Org Code is missing or invalid. Please provide a valid Org Code.")
-                return
-
-            # Fetch organization details
-            org_name, org_id_or_error = fetch_org_details(org_code)
-
-            if not org_name:
-                await org_code_message.reply_text(f"Error: {org_id_or_error}\nPlease ensure the Org Code is correct and try again.")
-                return
-
-            # Save Org ID globally for reuse
-            global stored_org_id
-            stored_org_id = org_id_or_error
-
-            # Display organization details
-            await org_code_message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
-
-            # Fetch and display courses
-            course_output, course_list = fetch_courses(org_id_or_error)
-            await org_code_message.reply_text(course_output)
-
-            if not course_list:
-                await org_code_message.reply_text("No courses found for this organization.")
-                return
-
-            # Step 2: Ask for Course ID
-            await org_code_message.reply_text("Please send your Course ID from the course list to encode:")
-
-            @bot.on_message(filters.text & filters.private)
-            async def handle_course_id(_, course_id_message):
-                course_id = course_id_message.text.strip()
-
-                # Validate Course ID
-                if not course_id.isdigit():
-                    await course_id_message.reply_text("Invalid Course ID. Please provide a numeric Course ID.")
-                    return
-
-                # Ensure stored_org_id is retained
-                global stored_org_id
-                print(f"Debug: Stored Org ID: {stored_org_id}")  # Debugging line
-
-                if not stored_org_id:
-                    await course_id_message.reply_text("Error: Organization ID is not available. Please restart the process.")
-                    return
-
-                # Encode the Course ID with Org ID
-                encoded_value = encode_course_with_base64(course_id, stored_org_id)
-
-                if "Error" in encoded_value:
-                    await course_id_message.reply_text(f"Encoding failed: {encoded_value}")
-                    return
-
-                # Send the encoded value back to the user
-                await course_id_message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
     except Exception as e:
         await message.reply_text(f"An unexpected error occurred: {str(e)}")
+
+# Handle Org Code Input
+@bot.on_message(filters.text & filters.private)
+async def handle_org_code(_, message):
+    global stored_org_id
+    if stored_org_id is not None:
+        # If Org ID is already stored, skip this step
+        return
+    org_code = message.text.strip()
+    if not org_code:
+        await message.reply_text("Error: Org Code is missing. Please provide a valid Org Code.")
+        return
+    # Fetch organization details
+    org_name, org_id_or_error = fetch_org_details(org_code)
+    if not org_name:
+        await message.reply_text(f"Error: {org_id_or_error}\nPlease ensure the Org Code is correct and try again.")
+        return
+    stored_org_id = org_id_or_error  # Store the Org ID globally
+    await message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
+
+    # Fetch and display courses
+    course_output, course_list = fetch_courses(org_id_or_error)
+    await message.reply_text(course_output)
+
+    if not course_list:
+        await message.reply_text("No courses found for this organization.")
+        return
+
+    # Ask for Course ID
+    await message.reply_text("Please send your Course ID from the course list to encode:")
+
+# Handle Course ID Input
+@bot.on_message(filters.text & filters.private)
+async def handle_course_id(_, message):
+    global stored_org_id
+    if stored_org_id is None:
+        # If Org ID is missing, prompt the user to start the process again
+        await message.reply_text("Error: Organization ID is not available. Please start the process again using /fetchdetails.")
+        return
+    course_id = message.text.strip()
+    if not course_id.isdigit():
+        await message.reply_text("Invalid Course ID. Please provide a numeric Course ID.")
+        return
+    # Encode the Course ID with Org ID
+    encoded_value = encode_course_with_base64(course_id, stored_org_id)
+    if "Error" in encoded_value:
+        await message.reply_text(f"Encoding failed: {encoded_value}")
+        return
+    await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
+    
 
         
 @bot.on_message(filters.command("id"))
@@ -885,6 +865,7 @@ async def upload(bot: Client, m: Message):
 
                 elif "adda247" in url:
                     try:
+                        await m.reply_text(f"Starting download for: {name}\nURL: {url}")
                          # Extract the file extension from the URL (e.g., .doc, .pdf)
                         response = requests.get(url, headers={
                             "Host": "store.adda247.com",  # Create output file name
@@ -907,8 +888,9 @@ async def upload(bot: Client, m: Message):
                             with open(output_file, "wb") as f:
                                 for chunk in response.iter_content(chunk_size=1024):
                                         f.write(chunk)
+                            await m.reply_text(f"File downloaded successfully: {output_file}")          
                          # Send the document
-                            await bot.send_document(chat_id=m.chat.id, document=output_file, caption=cc1)
+                            copy = await bot.send_document(chat_id=m.chat.id, document=output_file, caption=cc1)
                             count += 1
                          # Cleanup after sending
                             os.remove(output_file)

@@ -758,6 +758,9 @@ async def upload(bot: Client, m: Message):
                 elif '/utkarsha' in url:
                     id = url.split("/")[-2]
                     url = f"https://apps-s3-prod.utkarshapp.com/admin_v1/file_library/videos/enc_plain_mp4/{id}/plain/{{res}}.mp4"
+                    PROXY = "socks5://friendstv4113:Vu4DiHxrgb@103.172.85.194:50100"  # Replace with your proxy details
+                    os.environ['http_proxy'] = PROXY
+                    os.environ['https_proxy'] = PROXY
                 
                 
             if "embed" in url:

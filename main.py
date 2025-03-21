@@ -284,8 +284,9 @@ async def fetch_content(ctx, token: str):
 
 
 
-# Global variable to retain organization ID between steps
+# Global variables to retain organization ID and state
 stored_org_id = None
+bot_state = None  # Tracks the current state of the bot
 
 # Function to fetch organization details
 def fetch_org_details(org_code):
@@ -359,64 +360,52 @@ def encode_course_with_base64(course_id, org_id):
     except Exception as e:
         return f"Error during encoding: {e}"
 
-# Bot command to fetch organization details
+# Bot command to start the process
 @bot.on_message(filters.command("fetchdetails") & filters.private)
 async def fetch_details_command(_, message):
+    global stored_org_id, bot_state  # Access global variables
     try:
-        global stored_org_id  # Declare global to use across handlers
         stored_org_id = None  # Reset Org ID at the start of the flow
+        bot_state = "awaiting_org_code"  # Set bot state
         await message.reply_text("Please send your Org Code:")
     except Exception as e:
         await message.reply_text(f"An unexpected error occurred: {str(e)}")
 
-# Handle Org Code Input
+# Handle all text inputs and route based on state
 @bot.on_message(filters.text & filters.private)
-async def handle_org_code(_, message):
-    global stored_org_id
-    if stored_org_id is not None:
-        # If Org ID is already stored, skip this step
-        return
-    org_code = message.text.strip()
-    if not org_code:
-        await message.reply_text("Error: Org Code is missing. Please provide a valid Org Code.")
-        return
-    # Fetch organization details
-    org_name, org_id_or_error = fetch_org_details(org_code)
-    if not org_name:
-        await message.reply_text(f"Error: {org_id_or_error}\nPlease ensure the Org Code is correct and try again.")
-        return
-    stored_org_id = org_id_or_error  # Store the Org ID globally
-    await message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
+async def handle_input(_, message):
+    global stored_org_id, bot_state  # Access global variables
 
-    # Fetch and display courses
-    course_output, course_list = fetch_courses(org_id_or_error)
-    await message.reply_text(course_output)
+    if bot_state == "awaiting_org_code":
+        org_code = message.text.strip()
+        if not org_code:
+            await message.reply_text("Error: Org Code is missing. Please provide a valid Org Code.")
+            return
 
-    if not course_list:
-        await message.reply_text("No courses found for this organization.")
-        return
+        # Fetch organization details
+        org_name, org_id_or_error = fetch_org_details(org_code)
+        if not org_name:
+            await message.reply_text(f"Error: {org_id_or_error}\nPlease ensure the Org Code is correct and try again.")
+            return
 
-    # Ask for Course ID
-    await message.reply_text("Please send your Course ID from the course list to encode:")
+        # Store Org ID globally and update state
+        stored_org_id = org_id_or_error
+        bot_state = "awaiting_course_id"  # Update state
+        await message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
 
-# Handle Course ID Input
-@bot.on_message(filters.text & filters.private)
-async def handle_course_id(_, message):
-    global stored_org_id
-    try:
-        # Debugging: Check if Org ID is retained
-        print(f"Debug: Stored Org ID = {stored_org_id}")
+        # Fetch and display courses
+        course_output, _ = fetch_courses(org_id_or_error)
+        await message.reply_text(course_output)
+        await message.reply_text("Please send your Course ID from the course list to encode:")
 
+    elif bot_state == "awaiting_course_id":
         if stored_org_id is None:
             await message.reply_text(
                 "Error: Organization ID is missing. Please restart the process with /fetchdetails."
             )
             return
 
-        # Extract Course ID
         course_id = message.text.strip()
-        print(f"Debug: Received Course ID = {course_id}")  # Debugging
-        
         if not course_id.isdigit():
             await message.reply_text("Invalid Course ID. Please enter a numeric Course ID.")
             return
@@ -428,11 +417,12 @@ async def handle_course_id(_, message):
             return
 
         # Send the encoded value back to the user
+        bot_state = None  # Reset state after completion
         await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
-    except Exception as e:
-        # Handle unexpected errors
-        print(f"Debug: Error in handle_course_id: {e}")
-        await message.reply_text(f"An unexpected error occurred: {e}")
+
+    else:
+        await message.reply_text("Please start the process with /fetchdetails.")
+
         
 @bot.on_message(filters.command("id"))
 async def get_id(client: Client, msg: Message):

@@ -19,10 +19,10 @@ headers = {
     "api-version": "51"
 }
 
-def set_token(token):
+def set_token(encoded_value):
     global base_url, folder_base_url
-    base_url = f'https://api.classplusapp.com/v2/course/preview/content/list/{token}?limit=1000&offset=0'
-    folder_base_url = f'https://api.classplusapp.com/v2/course/preview/content/list/{token}?limit=1000&offset=0'
+    base_url = f'https://api.classplusapp.com/v2/course/preview/content/list/{encoded_value}?limit=1000&offset=0'
+    folder_base_url = f'https://api.classplusapp.com/v2/course/preview/content/list/{encoded_value}?limit=1000&offset=0'
 
 # Function to get folder name and IDs
 async def get_folders(session, folder_id=None):

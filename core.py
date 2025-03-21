@@ -154,56 +154,33 @@ def time_name():
 
 
 # Initialize failed_counter globally
-failed_counter = 0
-
-async def download_video(url, cmd, name):
-    PROXY = "socks5://friendstv4113:Vu4DiHxrgb@103.172.85.194:50100"  # Example SOCKS5 Proxy
-    download_cmd = f'{cmd} -R 25 --fragment-retries 25 --external-downloader aria2c ' \
-                   f'--downloader-args "aria2c: -x 16 -j 32 --all-proxy={PROXY}" --cookies cookies.txt'
-    
-    if "utkarsha" in url:
-        download_cmd += f' --proxy={PROXY}'
-
+async def download_video(url,cmd, name):
+    download_cmd = f'{cmd} -R 25 --fragment-retries 25 --external-downloader aria2c --downloader-args "aria2c: -x 16 -j 32" --cookies cookies.txt'
     global failed_counter
-    print(f"Running Command: {download_cmd}")
-
-    for retry in range(10):  # Retry up to 10 times
-        k = subprocess.run(download_cmd, shell=True, capture_output=True, text=True)
-        if k.returncode == 0:  # Successful download
-            print(f"Download successful on retry {retry + 1}")
-            break
-        print(f"Retry {retry + 1} failed. Error Output: {k.stderr}")
+    print(download_cmd)
+    logging.info(download_cmd)
+    k = subprocess.run(download_cmd, shell=True)
+    if "visionias" in cmd and k.returncode != 0 and failed_counter <= 10:
         failed_counter += 1
         await asyncio.sleep(5)
-
-    if k.returncode != 0:
-        raise Exception("Download failed after 10 retries.")
-
-    failed_counter = 0  # Reset the counter on success
-
+        await download_video(url, cmd, name)
+    failed_counter = 0
     try:
-        # Check if the file exists in various formats
         if os.path.isfile(name):
-            print(f"File found: {name}")
             return name
         elif os.path.isfile(f"{name}.webm"):
-            print(f"File found: {name}.webm")
             return f"{name}.webm"
         name = name.split(".")[0]
         if os.path.isfile(f"{name}.mkv"):
-            print(f"File found: {name}.mkv")
             return f"{name}.mkv"
         elif os.path.isfile(f"{name}.mp4"):
-            print(f"File found: {name}.mp4")
             return f"{name}.mp4"
         elif os.path.isfile(f"{name}.mp4.webm"):
-            print(f"File found: {name}.mp4.webm")
             return f"{name}.mp4.webm"
 
         return name
     except FileNotFoundError as exc:
-        print(f"File not found: {exc}")
-        return os.path.splitext(name)[0] + ".mp4"
+        return os.path.isfile.splitext[0] + "." + "mp4"
 
 
 async def send_doc(bot: Client, m: Message,cc,ka,cc1,prog,count,name):

@@ -279,8 +279,7 @@ async def fetch_content(ctx, token: str):
 
 
 
-stored_org_id = None  # Scoped for `/fetchdetails`
-bot_state = None  # Tracks the current state of the `/fetchdetails` workflow
+stored_org_id = None  # Scoped to this specific workflow
 
 # Function to fetch organization details
 def fetch_org_details(org_code):
@@ -354,26 +353,16 @@ def encode_course_with_base64(course_id, org_id):
     except Exception as e:
         return f"Error during encoding: {e}"
 
-# Command to start the `/fetchdetails` process
+# `/fetchdetails` command: Org Code and Course Workflow
 @bot.on_message(filters.command("fetchdetails") & filters.private)
 async def fetch_details_command(_, message):
-    global stored_org_id, bot_state  # Scoped variables for `/fetchdetails`
+    await message.reply_text("Please send your Org Code:")
+
     try:
-        # Reset state for this workflow
-        stored_org_id = None
-        bot_state = "awaiting_org_code"
-        await message.reply_text("Please send your Org Code:")
-    except Exception as e:
-        await message.reply_text(f"An unexpected error occurred: {str(e)}")
+        # Wait for the user to input the Org Code
+        org_code_msg = await bot.listen(message.chat.id)
+        org_code = org_code_msg.text.strip()
 
-# Handler for `/fetchdetails` input
-@bot.on_message(filters.text & filters.private)
-async def handle_fetchdetails_input(_, message):
-    global stored_org_id, bot_state  # Access global variables for `/fetchdetails`
-
-    # Handle Org Code Input
-    if bot_state == "awaiting_org_code":
-        org_code = message.text.strip()
         if not org_code:
             await message.reply_text("Error: Org Code is missing. Please provide a valid Org Code.")
             return
@@ -384,45 +373,40 @@ async def handle_fetchdetails_input(_, message):
             await message.reply_text(f"Error: {org_id_or_error}\nPlease ensure the Org Code is correct and try again.")
             return
 
-        # Store Org ID and update state
-        stored_org_id = org_id_or_error
-        bot_state = "awaiting_course_id"
         await message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
 
         # Fetch and display courses
-        course_output, _ = fetch_courses(org_id_or_error)
+        course_output, course_list = fetch_courses(org_id_or_error)
         await message.reply_text(course_output)
-        await message.reply_text("Please send your Course ID from the course list to encode:")
 
-    # Handle Course ID Input
-    elif bot_state == "awaiting_course_id":
-        if stored_org_id is None:
-            await message.reply_text(
-                "Error: Organization ID is missing. Please restart the process with /fetchdetails."
-            )
+        # If no courses are found, stop the process here
+        if not course_list:
+            await message.reply_text("No courses found for this organization.")
             return
 
-        course_id = message.text.strip()
+        # Ask for the Course ID
+        await message.reply_text("Please send your Course ID from the course list to encode:")
+
+        # Wait for the user to input the Course ID
+        course_id_msg = await bot.listen(message.chat.id)
+        course_id = course_id_msg.text.strip()
+
         if not course_id.isdigit():
             await message.reply_text("Invalid Course ID. Please enter a numeric Course ID.")
             return
 
         # Encode Course ID with Org ID
-        encoded_value = encode_course_with_base64(course_id, stored_org_id)
+        encoded_value = encode_course_with_base64(course_id, org_id_or_error)
         if "Error" in encoded_value:
             await message.reply_text(f"Encoding failed: {encoded_value}")
             return
 
-        # Reset state after completion
-        bot_state = None
+        # Send the encoded value back to the user
         await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
 
-# Default Text Handler for unrelated inputs
-@bot.on_message(filters.text & filters.private)
-async def fallback_handler(_, message):
-    # Catch unrelated messages or invalid inputs outside specific workflows
-    if bot_state is None:
-        await message.reply_text("Command not recognized. Try using `/start` or another valid command.")
+    except Exception as e:
+        await message.reply_text(f"An unexpected error occurred: {e}")
+
 
         
 @bot.on_message(filters.command("id"))

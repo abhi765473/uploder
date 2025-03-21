@@ -279,11 +279,6 @@ async def fetch_content(ctx, token: str):
 
 
 
-
-
-
-
-
 stored_org_id = None  # Scoped for `/fetchdetails`
 bot_state = None  # Tracks the current state of the `/fetchdetails` workflow
 
@@ -422,15 +417,12 @@ async def handle_fetchdetails_input(_, message):
         bot_state = None
         await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
 
-    # Default case (state mismatch)
-    else:
-        await message.reply_text("Please start the process with /fetchdetails.")
-
-# Example of a separate, independent command
-@bot.on_message(filters.command("othercommand") & filters.private)
-async def other_command_handler(_, message):
-    await message.reply_text("Processing another command... This works independently of `/fetchdetails`!")
-
+# Default Text Handler for unrelated inputs
+@bot.on_message(filters.text & filters.private)
+async def fallback_handler(_, message):
+    # Catch unrelated messages or invalid inputs outside specific workflows
+    if bot_state is None:
+        await message.reply_text("Command not recognized. Try using `/start` or another valid command.")
 
         
 @bot.on_message(filters.command("id"))

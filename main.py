@@ -11,7 +11,7 @@ import json
 import cloudscraper
 import requests
 import subprocess
-from your_module import course_details
+
 import random
 
 from datetime import datetime, timedelta

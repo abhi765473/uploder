@@ -284,9 +284,8 @@ async def fetch_content(ctx, token: str):
 
 
 
-# Global variables to retain organization ID and state
-stored_org_id = None
-bot_state = None  # Tracks the current state of the bot
+stored_org_id = None  # Scoped for `/fetchdetails`
+bot_state = None  # Tracks the current state of the `/fetchdetails` workflow
 
 # Function to fetch organization details
 def fetch_org_details(org_code):
@@ -360,22 +359,24 @@ def encode_course_with_base64(course_id, org_id):
     except Exception as e:
         return f"Error during encoding: {e}"
 
-# Bot command to start the process
+# Command to start the `/fetchdetails` process
 @bot.on_message(filters.command("fetchdetails") & filters.private)
 async def fetch_details_command(_, message):
-    global stored_org_id, bot_state  # Access global variables
+    global stored_org_id, bot_state  # Scoped variables for `/fetchdetails`
     try:
-        stored_org_id = None  # Reset Org ID at the start of the flow
-        bot_state = "awaiting_org_code"  # Set bot state
+        # Reset state for this workflow
+        stored_org_id = None
+        bot_state = "awaiting_org_code"
         await message.reply_text("Please send your Org Code:")
     except Exception as e:
         await message.reply_text(f"An unexpected error occurred: {str(e)}")
 
-# Handle all text inputs and route based on state
+# Handler for `/fetchdetails` input
 @bot.on_message(filters.text & filters.private)
-async def handle_input(_, message):
-    global stored_org_id, bot_state  # Access global variables
+async def handle_fetchdetails_input(_, message):
+    global stored_org_id, bot_state  # Access global variables for `/fetchdetails`
 
+    # Handle Org Code Input
     if bot_state == "awaiting_org_code":
         org_code = message.text.strip()
         if not org_code:
@@ -388,9 +389,9 @@ async def handle_input(_, message):
             await message.reply_text(f"Error: {org_id_or_error}\nPlease ensure the Org Code is correct and try again.")
             return
 
-        # Store Org ID globally and update state
+        # Store Org ID and update state
         stored_org_id = org_id_or_error
-        bot_state = "awaiting_course_id"  # Update state
+        bot_state = "awaiting_course_id"
         await message.reply_text(f"Organization Name: {org_name}\nOrganization ID: {org_id_or_error}")
 
         # Fetch and display courses
@@ -398,6 +399,7 @@ async def handle_input(_, message):
         await message.reply_text(course_output)
         await message.reply_text("Please send your Course ID from the course list to encode:")
 
+    # Handle Course ID Input
     elif bot_state == "awaiting_course_id":
         if stored_org_id is None:
             await message.reply_text(
@@ -416,12 +418,19 @@ async def handle_input(_, message):
             await message.reply_text(f"Encoding failed: {encoded_value}")
             return
 
-        # Send the encoded value back to the user
-        bot_state = None  # Reset state after completion
+        # Reset state after completion
+        bot_state = None
         await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
 
+    # Default case (state mismatch)
     else:
         await message.reply_text("Please start the process with /fetchdetails.")
+
+# Example of a separate, independent command
+@bot.on_message(filters.command("othercommand") & filters.private)
+async def other_command_handler(_, message):
+    await message.reply_text("Processing another command... This works independently of `/fetchdetails`!")
+
 
         
 @bot.on_message(filters.command("id"))
@@ -863,7 +872,6 @@ async def upload(bot: Client, m: Message):
 
                 elif "adda247" in url:
                     try:
-                        await m.reply_text(f"Starting download for: {name}\nURL: {url}")
                          # Extract the file extension from the URL (e.g., .doc, .pdf)
                         response = requests.get(url, headers={
                             "Host": "store.adda247.com",  # Create output file name
@@ -886,9 +894,8 @@ async def upload(bot: Client, m: Message):
                             with open(output_file, "wb") as f:
                                 for chunk in response.iter_content(chunk_size=1024):
                                         f.write(chunk)
-                            await m.reply_text(f"File downloaded successfully: {output_file}")          
                          # Send the document
-                            copy = await bot.send_document(chat_id=m.chat.id, document=output_file, caption=cc1)
+                            await bot.send_document(chat_id=m.chat.id, document=output_file, caption=cc1)
                             count += 1
                          # Cleanup after sending
                             os.remove(output_file)

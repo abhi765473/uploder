@@ -283,7 +283,8 @@ async def fetch_content(ctx, token: str):
 
 
 
-# Initialize global variable to store the organization ID
+
+# Global variable to store the organization ID
 stored_org_id = None
 
 # Function to fetch organization details
@@ -303,6 +304,7 @@ def fetch_org_details(org_code):
             'region': 'IN',
             'user-agent': 'Mobile-Android',
         }
+
         response = requests.get(f'{api}/orgs/{org_code}', headers=headers)
         if response.status_code == 200:
             res = response.json()
@@ -310,8 +312,7 @@ def fetch_org_details(org_code):
             org_name = res['data'].get('orgName', 'Name not available')
 
             global stored_org_id
-            stored_org_id = org_id
-
+            stored_org_id = org_id  # Save org ID for later use
             return org_name, org_id
         else:
             return None, f"Failed to fetch org details. Status Code: {response.status_code} - {response.text}"
@@ -338,6 +339,7 @@ def fetch_courses(org_id):
             "Api-Version": "22",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
+
         response = requests.get(base_url, params=query_params, headers=headers)
         if response.status_code == 200:
             data = response.json()
@@ -358,19 +360,22 @@ def fetch_courses(org_id):
     except Exception as e:
         return f"An error occurred: {e}", []
 
-# Function to encode courseId with orgId
+# Function to encode courseId with orgId into Base64
 def encode_course_with_base64(course_id, org_id):
     try:
-        payload = {"courseId": course_id, "tutorId": None, "orgId": org_id, "categoryId": None}
+        payload = {
+            "courseId": course_id,
+            "tutorId": None,
+            "orgId": org_id,
+            "categoryId": None
+        }
         decoded_json = json.dumps(payload)
         encoded_value = base64.b64encode(decoded_json.encode('utf-8')).decode('utf-8')
         return encoded_value
     except Exception as e:
         return f"Error during encoding: {e}"
 
-# Bot setup
-app = Client("bot")
-
+# Bot commands
 @bot.on_message(filters.command("fetchdetails") & filters.private)
 async def fetch_details_command(_, message):
     try:
@@ -379,6 +384,11 @@ async def fetch_details_command(_, message):
         @bot.on_message(filters.text & filters.private)
         async def handle_org_code(_, org_code_message):
             org_code = org_code_message.text.strip()
+
+            # Validate Org Code before making the API call
+            if not org_code:
+                await org_code_message.reply_text("Org Code is missing or invalid. Please provide a valid Org Code.")
+                return
 
             # Fetch organization details
             org_name, org_id_or_error = fetch_org_details(org_code)
@@ -408,6 +418,7 @@ async def fetch_details_command(_, message):
             async def handle_course_id(_, course_id_message):
                 course_id = course_id_message.text.strip()
 
+                # Validate Course ID
                 if not course_id.isdigit():
                     await course_id_message.reply_text("Invalid Course ID. Please provide a numeric Course ID.")
                     return
@@ -417,33 +428,18 @@ async def fetch_details_command(_, message):
                     await course_id_message.reply_text("Error: Organization ID is not available. Please restart the process.")
                     return
 
-                # Encode Course ID with Org ID
+                # Encode the Course ID with Org ID
                 encoded_value = encode_course_with_base64(course_id, stored_org_id)
                 if "Error" in encoded_value:
                     await course_id_message.reply_text(f"Encoding failed: {encoded_value}")
                     return
 
+                # Send the encoded value back to the user
                 await course_id_message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
     except Exception as e:
         await message.reply_text(f"An unexpected error occurred: {str(e)}")
 
 
-
-
-# Define the id command handler to get user or channel ID
-"""@bot.on_message(filters.command("id"))
-async def get_id(client: Client, msg: Message):
-    if msg.chat.type == "private":
-        await msg.reply(f"Your Telegram ID: {msg.from_user.id}")
-    else:
-        chat_name = msg.chat.title or "Unknown"
-        chat_id = msg.chat.id
-        await msg.reply(f"📃 Your Channel Name: {chat_name}\n"
-                        f"🆔 Your Channel ID: {chat_id}\n\n"
-                        "❌ This Chat ID is not in an Allowed Channel List\n\n"
-                        "To add this Channel, Click to Copy the Below Command\n\n"
-                        f"/add_channel {chat_id}\n\n"
-                        "and send to the bot directly.") """
         
 @bot.on_message(filters.command("id"))
 async def get_id(client: Client, msg: Message):
@@ -477,21 +473,6 @@ async def get_id(client: Client, msg: Message):
                         reply_markup=keyboard)
         
 
-        
-"""@Client.on_message(filters.command("id"))
-async def get_id(client: Client, msg: Message):
-    if msg.chat.type == "private":
-        await msg.reply(f"Your Telegram ID = {msg.from_user.id}\n\n"
-                        "Send this ID directly to the bot.")
-    elif msg.chat.type in ["group", "supergroup", "channel"]:
-        chat_name = msg.chat.title or "Unknown"
-        chat_id = msg.chat.id
-        await msg.reply(f"📃 Your Channel Name: {chat_name}\n"
-                        f"🆔 Your Channel ID: {chat_id}\n\n"
-                        "❌ This Chat ID is not in an Allowed Channel List\n\n"
-                        "To add this Channel, Click to Copy the Below Command\n\n"
-                        f"/add_channel {chat_id}\n\n"
-                        "and send to the bot directly.")"""
 
 # Define the add_channel command handler for admin
 @bot.on_message(filters.command("add_channel") & filters.user(admins))
@@ -897,13 +878,13 @@ async def upload(bot: Client, m: Message):
                         count += 1
                         continue
 
-                elif "adda" in url:
+                elif "adda247" in url:
                     try:
                         getstatusoutput(
                               f'curl --http2 -X GET -H "Host:store.adda247.com" -H "user-agent:Mozilla/5.0 (Linux; Android 11; moto g(40) fusion Build/RRI31.Q1-42-51-8; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/97.0.4692.98 Mobile Safari/537.36" -H "accept:*/*" -H "x-requested-with:com.adda247.app" -H "sec-fetch-site:same-origin" -H "sec-fetch-mode:cors" -H "sec-fetch-dest:empty" -H "referer:https://store.adda247.com/build/pdf.worker.js" -H "accept-encoding:gzip, deflate" -H "accept-language:en-US,en;q=0.9" -H "cookie:cp_token={raw_text4}" "{url}" --output "{name}.pdf"'
                         )
 
-                        copy = await bot.send_document(chat_id=m.chat.id,document=ka, caption=cc1)
+                        copy = await bot.send_document(chat_id=m.chat.id,document=f'{name}.pdf', caption=cc1)
                         count += 1
                         await prog.delete(True)  # Delete the progress message
                         os.remove(f"{name}.pdf")  # Remove the file
@@ -974,9 +955,13 @@ async def upload(bot: Client, m: Message):
                 )
                 continue
 
+    
     except Exception as e:
         await m.reply_text(e)
-    await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎**")
+    await m.reply_text(f"⋅ ─ list index (**{str(count).zfill(3)}**-**{len(links) - count}**) out of range ─ ⋅\n\n"
+                   f"✨ **BATCH** » {raw_text0} ✨\n\n"
+                   f"⋅ ─ DOWNLOADING ✩ COMPLETED ─ .")
+    await m.reply_text("**That's It ❤️**")
 
 
 bot.run()

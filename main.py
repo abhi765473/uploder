@@ -283,12 +283,6 @@ async def fetch_content(ctx, token: str):
 
 
 
-import requests
-import base64
-import json
-import os
-from pyrogram import Client, filters
-from pyrogram.errors import FloodWait
 
 # Global variable to retain organization ID between steps
 stored_org_id = None
@@ -409,22 +403,36 @@ async def handle_org_code(_, message):
 @bot.on_message(filters.text & filters.private)
 async def handle_course_id(_, message):
     global stored_org_id
-    if stored_org_id is None:
-        # If Org ID is missing, prompt the user to start the process again
-        await message.reply_text("Error: Organization ID is not available. Please start the process again using /fetchdetails.")
-        return
-    course_id = message.text.strip()
-    if not course_id.isdigit():
-        await message.reply_text("Invalid Course ID. Please provide a numeric Course ID.")
-        return
-    # Encode the Course ID with Org ID
-    encoded_value = encode_course_with_base64(course_id, stored_org_id)
-    if "Error" in encoded_value:
-        await message.reply_text(f"Encoding failed: {encoded_value}")
-        return
-    await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
-    
+    try:
+        # Debugging: Check if Org ID is retained
+        print(f"Debug: Stored Org ID = {stored_org_id}")
 
+        if stored_org_id is None:
+            await message.reply_text(
+                "Error: Organization ID is missing. Please restart the process with /fetchdetails."
+            )
+            return
+
+        # Extract Course ID
+        course_id = message.text.strip()
+        print(f"Debug: Received Course ID = {course_id}")  # Debugging
+        
+        if not course_id.isdigit():
+            await message.reply_text("Invalid Course ID. Please enter a numeric Course ID.")
+            return
+
+        # Encode Course ID with Org ID
+        encoded_value = encode_course_with_base64(course_id, stored_org_id)
+        if "Error" in encoded_value:
+            await message.reply_text(f"Encoding failed: {encoded_value}")
+            return
+
+        # Send the encoded value back to the user
+        await message.reply_text(f"Encoded value for Course ID {course_id}: {encoded_value}")
+    except Exception as e:
+        # Handle unexpected errors
+        print(f"Debug: Error in handle_course_id: {e}")
+        await message.reply_text(f"An unexpected error occurred: {e}")
         
 @bot.on_message(filters.command("id"))
 async def get_id(client: Client, msg: Message):
